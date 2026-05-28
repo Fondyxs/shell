@@ -8,8 +8,8 @@ echo "==> Установка Reception..."
 echo "Access Token:"
 read -s GITHUB_TOKEN
 
-WEB_REPO="https://${GITHUB_TOKEN}@github.com/Fondyx/reception-web"
-BOT_REPO="https://${GITHUB_TOKEN}@github.com/Fondyx/reception-bot"
+WEB_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/reception-web"
+BOT_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/reception-bot"
 WEB_DIR="/home/reception-web"
 BOT_DIR="/home/reception-bot"
 
