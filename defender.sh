@@ -20,20 +20,22 @@ apt install -y ufw fail2ban unattended-upgrades curl wget
 
 # --- Создание пользователя ---
 echo "==> Создание пользователя..."
-read -p "Введи имя пользователя: " USERNAME
-
-# Проверка что имя не пустое
-if [ -z "$USERNAME" ]; then
-    echo "Имя пользователя не может быть пустым"
-    exit 1
-fi
-
-# Создать только если не существует
-if id "$USERNAME" &>/dev/null; then
-    echo "  Пользователь $USERNAME уже существует"
-else
+while true; do
+    read -p "Введи имя пользователя: " USERNAME
+    
+    if [ -z "$USERNAME" ]; then
+        echo "  Имя не может быть пустым"
+        continue
+    fi
+    
+    if id "$USERNAME" &>/dev/null; then
+        echo "  Пользователь $USERNAME уже существует, введи другое"
+        continue
+    fi
+    
     useradd -m -s /bin/bash $USERNAME
-fi
+    break
+done
 
 usermod -aG sudo $USERNAME
 
@@ -50,18 +52,34 @@ PRIVATE_KEY=$(cat /home/$USERNAME/.ssh/id_rsa)
 echo "==> Настройка SSH..."
 SSH_PORT=2222
 
-sed -i "s/#Port 22/Port $SSH_PORT/" /etc/ssh/sshd_config
-sed -i "s/Port 22/Port $SSH_PORT/" /etc/ssh/sshd_config
-sed -i "s/#PermitRootLogin yes/PermitRootLogin no/" /etc/ssh/sshd_config
-sed -i "s/PermitRootLogin yes/PermitRootLogin no/" /etc/ssh/sshd_config
-sed -i "s/#PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config
-sed -i "s/PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config
-sed -i "s/#MaxAuthTries 6/MaxAuthTries 3/" /etc/ssh/sshd_config
-sed -i "s/#LoginGraceTime 2m/LoginGraceTime 30/" /etc/ssh/sshd_config
-echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config
-sed -i "s/X11Forwarding yes/X11Forwarding no/" /etc/ssh/sshd_config
+# Полная перезапись конфига вместо sed
+cat > /etc/ssh/sshd_config << EOF
+Port $SSH_PORT
+Protocol 2
 
-systemctl restart sshd
+PermitRootLogin no
+PasswordAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+MaxAuthTries 3
+LoginGraceTime 30
+MaxSessions 5
+
+X11Forwarding no
+AllowTcpForwarding no
+GatewayPorts no
+PermitTunnel no
+
+UsePAM yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
+
+# Проверить конфиг перед рестартом
+sshd -t && systemctl restart ssh || systemctl restart sshd
 
 # --- UFW Firewall ---
 echo "==> Настройка UFW..."
@@ -154,7 +172,6 @@ systemctl disable avahi-daemon 2>/dev/null || true
 # --- Защита важных файлов ---
 echo "==> Защита файлов..."
 chmod 700 /root
-chmod 600 /etc/ssh/sshd_config
 chmod 644 /etc/passwd
 chmod 640 /etc/shadow
 
