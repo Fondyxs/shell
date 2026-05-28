@@ -9,3 +9,6 @@ chmod +x reception-install.sh
 bash reception-install.sh
 
 # Обновление ресепшена
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/reception/main/update.sh -o reception-update.sh 
+chmod +x reception-update.sh
+bash reception-update.sh
