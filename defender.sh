@@ -52,10 +52,9 @@ PRIVATE_KEY=$(cat /home/$USERNAME/.ssh/id_rsa)
 echo "==> Настройка SSH..."
 SSH_PORT=2222
 
-# Очистить старый конфиг полностью
-> /etc/ssh/sshd_config
-
-cat > /etc/ssh/sshd_config << 'SSHEOF'
+# Полностью удалить и пересоздать
+rm -f /etc/ssh/sshd_config
+tee /etc/ssh/sshd_config > /dev/null << 'SSHEOF'
 Port 2222
 Protocol 2
 
@@ -72,14 +71,17 @@ MaxSessions 5
 X11Forwarding no
 GatewayPorts no
 PermitTunnel no
+KbdInteractiveAuthentication no
 
 UsePAM yes
+UseDNS no
 PrintMotd no
 AcceptEnv LANG LC_*
 Subsystem sftp /usr/lib/openssh/sftp-server
 SSHEOF
 
-# Проверить конфиг перед рестартом
+chmod 600 /etc/ssh/sshd_config
+
 if sshd -t; then
     systemctl restart ssh 2>/dev/null || systemctl restart sshd
     echo "  SSH перезапущен на порту ${SSH_PORT}"
