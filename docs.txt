@@ -2,3 +2,8 @@
 curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/defender.sh -o defender.sh 
 chmod +x defender.sh
 bash defender.sh
+
+# Установка ресепшена
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/install.sh -o install.sh 
+chmod +x install.sh
+bash install.sh

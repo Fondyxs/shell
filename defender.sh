@@ -18,47 +18,26 @@ apt update -y && apt upgrade -y
 echo "==> Установка пакетов..."
 apt install -y ufw fail2ban unattended-upgrades curl wget
 
-# --- Создание пользователя ---
-echo "==> Создание пользователя..."
-while true; do
-    read -p "Введи имя пользователя: " USERNAME
-    
-    if [ -z "$USERNAME" ]; then
-        echo "  Имя не может быть пустым"
-        continue
-    fi
-    
-    if id "$USERNAME" &>/dev/null; then
-        echo "  Пользователь $USERNAME уже существует, введи другое"
-        continue
-    fi
-    
-    useradd -m -s /bin/bash $USERNAME
-    break
-done
+# --- SSH ключ для root ---
+echo "==> Генерация SSH ключа для root..."
+mkdir -p /root/.ssh
+ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
+cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+chmod 700 /root/.ssh
+chmod 600 /root/.ssh/authorized_keys
 
-usermod -aG sudo $USERNAME
-
-mkdir -p /home/$USERNAME/.ssh
-ssh-keygen -t rsa -b 4096 -f /home/$USERNAME/.ssh/id_rsa -N ""
-cat /home/$USERNAME/.ssh/id_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys
-chmod 700 /home/$USERNAME/.ssh
-chmod 600 /home/$USERNAME/.ssh/authorized_keys
-chown -R $USERNAME:$USERNAME /home/$USERNAME/.ssh
-
-PRIVATE_KEY=$(cat /home/$USERNAME/.ssh/id_rsa)
+PRIVATE_KEY=$(cat /root/.ssh/id_rsa)
 
 # --- SSH защита ---
 echo "==> Настройка SSH..."
 SSH_PORT=2222
 
-# Полностью удалить и пересоздать
 rm -f /etc/ssh/sshd_config
 tee /etc/ssh/sshd_config > /dev/null << 'SSHEOF'
 Port 2222
 Protocol 2
 
-PermitRootLogin no
+PermitRootLogin prohibit-password
 PasswordAuthentication no
 PermitEmptyPasswords no
 PubkeyAuthentication yes
@@ -82,7 +61,6 @@ SSHEOF
 
 chmod 600 /etc/ssh/sshd_config
 
-# Создать директорию для privilege separation
 mkdir -p /run/sshd
 
 if sshd -t; then
@@ -93,8 +71,6 @@ else
     sshd -t
     exit 1
 fi
-
-
 
 # --- UFW Firewall ---
 echo "==> Настройка UFW..."
@@ -209,11 +185,11 @@ echo "================================================"
 echo ""
 echo "  Хост:   $SERVER_IP"
 echo "  Порт:   $SSH_PORT"
-echo "  Юзер:   $USERNAME"
+echo "  Юзер:   root"
 echo "  Вход:   По SSH ключу"
 echo ""
 echo "  Команда для входа:"
-echo "  ssh -p $SSH_PORT -i id_rsa $USERNAME@$SERVER_IP"
+echo "  ssh -p $SSH_PORT -i id_rsa root@$SERVER_IP"
 echo ""
 echo "================================================"
 echo "  ПРИВАТНЫЙ SSH КЛЮЧ (сохрани его):"
@@ -224,13 +200,13 @@ echo ""
 echo "================================================"
 echo "  Сохрани ключ в файл id_rsa и подключайся:"
 echo "  chmod 600 id_rsa"
-echo "  ssh -p $SSH_PORT -i id_rsa $USERNAME@$SERVER_IP"
+echo "  ssh -p $SSH_PORT -i id_rsa root@$SERVER_IP"
 echo "================================================"
 echo ""
 echo "  Что защищено:"
 echo "  - SSH порт изменён с 22 на $SSH_PORT"
-echo "  - Root логин отключён"
-echo "  - Вход только по SSH ключу"
+echo "  - Вход только по SSH ключу (пароль отключён)"
+echo "  - Root вход только по ключу"
 echo "  - UFW firewall включён (80, 443, 5000, $SSH_PORT)"
 echo "  - Fail2Ban включён (бан на 24ч после 3 попыток)"
 echo "  - Защита от SYN флуда"
