@@ -52,9 +52,8 @@ PRIVATE_KEY=$(cat /home/$USERNAME/.ssh/id_rsa)
 echo "==> Настройка SSH..."
 SSH_PORT=2222
 
-# Полная перезапись конфига вместо sed
 cat > /etc/ssh/sshd_config << EOF
-Port $SSH_PORT
+Port ${SSH_PORT}
 Protocol 2
 
 PermitRootLogin no
@@ -68,7 +67,6 @@ LoginGraceTime 30
 MaxSessions 5
 
 X11Forwarding no
-AllowTcpForwarding no
 GatewayPorts no
 PermitTunnel no
 
@@ -79,7 +77,14 @@ Subsystem sftp /usr/lib/openssh/sftp-server
 EOF
 
 # Проверить конфиг перед рестартом
-sshd -t && systemctl restart ssh || systemctl restart sshd
+if sshd -t; then
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd
+    echo "  SSH перезапущен на порту ${SSH_PORT}"
+else
+    echo "  ОШИБКА в конфиге SSH!"
+    sshd -t
+    exit 1
+fi
 
 # --- UFW Firewall ---
 echo "==> Настройка UFW..."

@@ -1,2 +1,4 @@
 # Установка защиты на сервер
-curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/defender.sh | bash
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/defender.sh -o defender.sh
+chmod +x defender.sh
+bash defender.sh
