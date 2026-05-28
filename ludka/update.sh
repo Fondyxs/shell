@@ -2,10 +2,7 @@
 
 set -e
 
-# ═══════════════════════════════════════════════════════════════
-# update.sh — обновление Reception
-# Использование: sudo bash update.sh <GITHUB_TOKEN>
-# ═══════════════════════════════════════════════════════════════
+echo "==> Обновление Ludka..."
 
 # --- Проверка аргументов ---
 if [ -z "$1" ]; then
@@ -20,25 +17,25 @@ if [ "$EUID" -ne 0 ]; then
     echo "Запусти от root"
     exit 1
 fi
+WEB_DIR="/home/ludka-web"
+BOT_DIR="/home/ludka-bot"
 
-WEB_DIR="/home/reception-web"
-BOT_DIR="/home/reception-bot"
 
-WEB_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/reception-web"
-BOT_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/reception-bot"
+WEB_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/ludka-web"
+BOT_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/ludka-bot"
 
 # --- Остановка ---
 echo "==> Остановка сервисов..."
-supervisorctl stop reception:* || true
+supervisorctl stop ludka:* || true
 
 # --- Обновление кода ---
-echo "==> Обновление reception-web..."
+echo "==> Обновление ludka-web..."
 cd $WEB_DIR
 git remote set-url origin $WEB_REPO
 git fetch origin
 git reset --hard origin/main
 
-echo "==> Обновление reception-bot..."
+echo "==> Обновление ludka-bot..."
 cd $BOT_DIR
 git remote set-url origin $BOT_REPO
 git fetch origin
@@ -54,13 +51,13 @@ $BOT_DIR/venv/bin/pip install -r /tmp/bot_req.txt --quiet
 
 # --- Запуск ---
 echo "==> Запуск сервисов..."
-supervisorctl start reception:*
+supervisorctl start ludka:*
 
 sleep 2
 echo ""
 echo "================================================"
-supervisorctl status reception:*
+supervisorctl status ludka:*
 echo "================================================"
 echo ""
-echo "✓ Reception обновлён!"
-echo "  Логи: tail -f /var/log/reception/*.log"
+echo "✓ Ludka обновлён!"
+echo "  Логи: tail -f /var/log/ludka/*.log"
