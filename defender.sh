@@ -82,6 +82,9 @@ SSHEOF
 
 chmod 600 /etc/ssh/sshd_config
 
+# Создать директорию для privilege separation
+mkdir -p /run/sshd
+
 if sshd -t; then
     systemctl restart ssh 2>/dev/null || systemctl restart sshd
     echo "  SSH перезапущен на порту ${SSH_PORT}"
@@ -90,6 +93,8 @@ else
     sshd -t
     exit 1
 fi
+
+
 
 # --- UFW Firewall ---
 echo "==> Настройка UFW..."
