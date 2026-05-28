@@ -34,16 +34,16 @@ $WEB_DIR/venv/bin/pip install -r $WEB_DIR/requirements.txt
 python3 -m venv $BOT_DIR/venv
 $BOT_DIR/venv/bin/pip install -r $BOT_DIR/requirements.txt
 
-# # --- .env ---
-# echo "==> Настройка .env..."
-# if [ ! -f "$WEB_DIR/.env" ]; then
-#     cp $WEB_DIR/.env.example $WEB_DIR/.env
-#     echo "  ! Заполни $WEB_DIR/.env"
-# fi
-# if [ ! -f "$BOT_DIR/.env" ]; then
-#     cp $BOT_DIR/.env.example $BOT_DIR/.env
-#     echo "  ! Заполни $BOT_DIR/.env"
-# fi
+# --- .env ---
+echo "==> Настройка .env..."
+if [ ! -f "$WEB_DIR/.env" ]; then
+    cp $WEB_DIR/.env.example $WEB_DIR/.env
+    echo "  ! Заполни $WEB_DIR/.env"
+fi
+if [ ! -f "$BOT_DIR/.env" ]; then
+    cp $BOT_DIR/.env.example $BOT_DIR/.env
+    echo "  ! Заполни $BOT_DIR/.env"
+fi
 
 # --- Supervisor ---
 echo "==> Настройка Supervisor..."

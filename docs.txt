@@ -4,6 +4,8 @@ chmod +x defender.sh
 bash defender.sh
 
 # Установка ресепшена
-curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/install.sh -o install.sh 
-chmod +x install.sh
-bash install.sh
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/reception/main/install.sh -o reception-install.sh 
+chmod +x reception-install.sh
+bash reception-install.sh
+
+# Обновление ресепшена
