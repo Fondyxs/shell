@@ -21,7 +21,20 @@ apt install -y ufw fail2ban unattended-upgrades curl wget
 # --- Создание пользователя ---
 echo "==> Создание пользователя..."
 read -p "Введи имя пользователя: " USERNAME
-useradd -m -s /bin/bash $USERNAME
+
+# Проверка что имя не пустое
+if [ -z "$USERNAME" ]; then
+    echo "Имя пользователя не может быть пустым"
+    exit 1
+fi
+
+# Создать только если не существует
+if id "$USERNAME" &>/dev/null; then
+    echo "  Пользователь $USERNAME уже существует"
+else
+    useradd -m -s /bin/bash $USERNAME
+fi
+
 usermod -aG sudo $USERNAME
 
 mkdir -p /home/$USERNAME/.ssh
