@@ -13,3 +13,12 @@ curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/reception/update.
 chmod +x reception-update.sh
 bash reception-update.sh token
 
+# Установка комьюнити
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/community/install.sh -o community-install.sh 
+chmod +x community-install.sh
+bash community-install.sh
+
+# Обновление комьюнити
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/community/update.sh -o community-update.sh
+chmod +x community-update.sh
+bash community-update.sh token
