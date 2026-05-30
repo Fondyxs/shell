@@ -8,7 +8,7 @@ curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/reception/install
 chmod +x reception-install.sh
 bash reception-install.sh
 
-# Обновление ресепшена
+# Обновление  ресепшена
 curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/reception/update.sh -o reception-update.sh
 chmod +x reception-update.sh
 bash reception-update.sh token
@@ -22,3 +22,23 @@ bash community-install.sh
 curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/community/update.sh -o community-update.sh
 chmod +x community-update.sh
 bash community-update.sh token
+
+# Установка лудки
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/ludka/install.sh -o ludka-install.sh 
+chmod +x ludka-install.sh
+bash ludka-install.sh
+
+# Обновление лудки
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/ludka/update.sh -o ludka-update.sh
+chmod +x ludka-update.sh
+bash ludka-update.sh token
+
+# Установка скрайб
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/scribe/install.sh -o scribe-install.sh 
+chmod +x scribe-install.sh
+bash scribe-install.sh
+
+# Обновление скрайб
+curl -sSL https://raw.githubusercontent.com/Fondyxs/shell/main/scribe/update.sh -o scribe-update.sh
+chmod +x scribe-update.sh
+bash scribe-update.sh token
