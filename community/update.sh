@@ -30,11 +30,13 @@ fi
 WEB_DIR="/home/community-web"
 BOT_DIR="/home/community-bot"
 BOT1_DIR="/home/priem-bot"
+BOT2_DIR="/home/moder-bot"
 
 # Репозитории
 WEB_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/community-web"
 BOT_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/community-bot"
 BOT1_REPO="https://${GITHUB_TOKEN}@github.com/fantastic12314/priem-bot"
+BOT2_REPO="https://${GITHUB_TOKEN}@github.com/Fondyxs/moder-bot"
 
 echo "================================================"
 echo "Начинаем обновление community"
@@ -81,6 +83,18 @@ cd "$BOT1_DIR"
 /usr/bin/git fetch origin
 /usr/bin/git reset --hard origin/main
 
+# =========================================================
+# BOT2
+# =========================================================
+
+echo "==> Обновляем moder-bot..."
+
+cd "$BOT2_DIR"
+
+/usr/bin/git remote set-url origin "$BOT2_REPO"
+/usr/bin/git fetch origin
+/usr/bin/git reset --hard origin/main
+
 
 # =========================================================
 # DEPENDENCIES
@@ -109,6 +123,14 @@ if [ -f "$BOT1_DIR/requirements.txt" ]; then
 
     "$BOT1_DIR/venv/bin/pip" install \
         -r /tmp/bot1_req.txt \
+        --no-input
+fi
+
+if [ -f "$BOT2_DIR/requirements.txt" ]; then
+    grep -v "pywin32" "$BOT2_DIR/requirements.txt" > /tmp/bot2_req.txt
+
+    "$BOT2_DIR/venv/bin/pip" install \
+        -r /tmp/bot2_req.txt \
         --no-input
 fi
 
