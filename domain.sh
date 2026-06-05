@@ -22,7 +22,7 @@ NGINX_LINK="/etc/nginx/sites-enabled/$CONFIG_NAME"
 
 # ── 1. Проверка DNS ────────────────────────────────────────────────────────
 SERVER_IP=$(curl -s https://ifconfig.me || echo "")
-DOMAIN_IP=$(getent hosts "$DOMAIN" | awk '{ print $1 }' || echo "")
+DOMAIN_IP=$(dig +short A "$DOMAIN" | head -1 || getent hosts "$DOMAIN" | awk '{print $1}' | head -1 || echo "")
 
 if [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
     exit_with_error "DNS_NOT_READY: $DOMAIN points to $DOMAIN_IP, server is $SERVER_IP"
@@ -30,7 +30,7 @@ fi
 
 # ── 2. Установка софта ─────────────────────────────────────────────────────
 if ! command -v nginx &> /dev/null || ! command -v certbot &> /dev/null; then
-    apt-get update -qq && apt-get install -y nginx certbot python3-certbot-nginx -qq > /dev/null 2>&1
+    apt-get update -qq && apt-get install -y nginx certbot python3-certbot-nginx dnsutils -qq > /dev/null 2>&1
 fi
 
 # ── 3. Настройка Nginx ─────────────────────────────────────────────────────
@@ -38,10 +38,10 @@ if [ -f "$NGINX_CONF" ]; then
     # Если файл есть, проверяем нет ли уже этого домена
     if ! grep -q -w "$DOMAIN" "$NGINX_CONF"; then
         # Читаем текущие домены, добавляем новый, убираем лишние пробелы
-        CURRENT_DOMAINS=$(grep "server_name" "$NGINX_CONF" | sed 's/.*server_name \(.*\);/\1/')
+        CURRENT_DOMAINS=$(grep "server_name" "$NGINX_CONF" | sed 's/.*server_name \(.*\);/\1/' | xargs)
         NEW_DOMAINS_LINE="$CURRENT_DOMAINS $DOMAIN"
-        # Перезаписываем строку server_name на чистую
-        sed -i "s/server_name .*;/server_name $NEW_DOMAINS_LINE;/" "$NGINX_CONF"
+        # Используем | как разделитель, чтобы пробелы и спецсимволы не ломали sed
+        sed -i "s|server_name .*;|server_name $NEW_DOMAINS_LINE;|" "$NGINX_CONF"
     fi
 else
     # Создаем новый конфиг
@@ -72,11 +72,9 @@ systemctl reload nginx
 
 # ── 4. SSL через Certbot ───────────────────────────────────────────────────
 # Получаем список доменов в формате dom1.com,dom2.com для Certbot
-# xargs уберет лишние пробелы по краям
 FINAL_DOMAINS=$(grep "server_name" "$NGINX_CONF" | sed 's/.*server_name \(.*\);/\1/' | xargs | tr ' ' ',')
 
 # Запускаем Certbot
-# Мы убрали > /dev/null, чтобы в случае ошибки Python мог прочитать причину
 if ! certbot --nginx -d "$FINAL_DOMAINS" --email "$EMAIL" --agree-tos --non-interactive --redirect --expand --cert-name "$CONFIG_NAME"; then
     exit_with_error "SSL_ISSUANCE_FAILED"
 fi

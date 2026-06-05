@@ -18,16 +18,6 @@ apt update -y && apt upgrade -y
 echo "==> Установка пакетов..."
 apt install -y ufw fail2ban unattended-upgrades curl wget
 
-# --- SSH ключ для root ---
-echo "==> Генерация SSH ключа для root..."
-mkdir -p /root/.ssh
-ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
-cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
-chmod 700 /root/.ssh
-chmod 600 /root/.ssh/authorized_keys
-
-PRIVATE_KEY=$(cat /root/.ssh/id_rsa)
-
 # --- SSH защита ---
 echo "==> Настройка SSH..."
 SSH_PORT=2222
@@ -37,8 +27,8 @@ tee /etc/ssh/sshd_config > /dev/null << 'SSHEOF'
 Port 2222
 Protocol 2
 
-PermitRootLogin prohibit-password
-PasswordAuthentication no
+PermitRootLogin yes
+PasswordAuthentication yes
 PermitEmptyPasswords no
 PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
@@ -186,27 +176,16 @@ echo ""
 echo "  Хост:   $SERVER_IP"
 echo "  Порт:   $SSH_PORT"
 echo "  Юзер:   root"
-echo "  Вход:   По SSH ключу"
+echo "  Вход:   По паролю или SSH ключу"
 echo ""
 echo "  Команда для входа:"
-echo "  ssh -p $SSH_PORT -i id_rsa root@$SERVER_IP"
+echo "  ssh -p $SSH_PORT root@$SERVER_IP"
 echo ""
 echo "================================================"
-echo "  ПРИВАТНЫЙ SSH КЛЮЧ (сохрани его):"
-echo "================================================"
-echo ""
-echo "$PRIVATE_KEY"
-echo ""
-echo "================================================"
-echo "  Сохрани ключ в файл id_rsa и подключайся:"
-echo "  chmod 600 id_rsa"
-echo "  ssh -p $SSH_PORT -i id_rsa root@$SERVER_IP"
-echo "================================================"
-echo ""
 echo "  Что защищено:"
 echo "  - SSH порт изменён с 22 на $SSH_PORT"
-echo "  - Вход только по SSH ключу (пароль отключён)"
-echo "  - Root вход только по ключу"
+echo "  - Пустые пароли запрещены"
+echo "  - Root вход разрешён (по паролю)"
 echo "  - UFW firewall включён (80, 443, 5000, $SSH_PORT)"
 echo "  - Fail2Ban включён (бан на 24ч после 3 попыток)"
 echo "  - Защита от SYN флуда"
