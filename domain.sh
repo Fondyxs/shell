@@ -2,7 +2,6 @@
 
 set -e
 
-# Функция для вывода ошибки и выхода
 exit_with_error() {
     echo "ERROR: $1" >&2
     exit 1
@@ -21,31 +20,89 @@ NGINX_CONF="/etc/nginx/sites-available/$CONFIG_NAME"
 NGINX_LINK="/etc/nginx/sites-enabled/$CONFIG_NAME"
 
 # ── 1. Проверка DNS ────────────────────────────────────────────────────────
-SERVER_IP=$(curl -s https://ifconfig.me || echo "")
 DOMAIN_IP=$(dig +short A "$DOMAIN" | head -1 || getent hosts "$DOMAIN" | awk '{print $1}' | head -1 || echo "")
 
-if [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
-    exit_with_error "DNS_NOT_READY: $DOMAIN points to $DOMAIN_IP, server is $SERVER_IP"
+if [ -z "$DOMAIN_IP" ]; then
+    exit_with_error "DNS_NOT_READY: $DOMAIN does not resolve to any IP"
 fi
 
+echo "DNS OK: $DOMAIN -> $DOMAIN_IP"
+
+# Определяем Cloudflare по диапазонам их IP
+IS_CLOUDFLARE=false
+CLOUDFLARE_RANGES=$(curl -s --max-time 5 https://www.cloudflare.com/ips-v4 || echo "")
+
+if [ -n "$CLOUDFLARE_RANGES" ]; then
+    while IFS= read -r range; do
+        if python3 -c "import ipaddress; exit(0 if ipaddress.ip_address('$DOMAIN_IP') in ipaddress.ip_network('$range') else 1)" 2>/dev/null; then
+            IS_CLOUDFLARE=true
+            break
+        fi
+    done <<< "$CLOUDFLARE_RANGES"
+fi
+
+echo "Cloudflare proxy: $IS_CLOUDFLARE"
+
 # ── 2. Установка софта ─────────────────────────────────────────────────────
-if ! command -v nginx &> /dev/null || ! command -v certbot &> /dev/null; then
-    apt-get update -qq && apt-get install -y nginx certbot python3-certbot-nginx dnsutils -qq > /dev/null 2>&1
+if ! command -v nginx &> /dev/null; then
+    apt-get update -qq && apt-get install -y nginx dnsutils -qq > /dev/null 2>&1
+fi
+
+if [ "$IS_CLOUDFLARE" = false ] && ! command -v certbot &> /dev/null; then
+    apt-get update -qq && apt-get install -y certbot python3-certbot-nginx -qq > /dev/null 2>&1
 fi
 
 # ── 3. Настройка Nginx ─────────────────────────────────────────────────────
 if [ -f "$NGINX_CONF" ]; then
-    # Если файл есть, проверяем нет ли уже этого домена
+    # Конфиг уже есть — добавляем домен если его нет
     if ! grep -q -w "$DOMAIN" "$NGINX_CONF"; then
-        # Читаем текущие домены, добавляем новый, убираем лишние пробелы
-        CURRENT_DOMAINS=$(grep "server_name" "$NGINX_CONF" | sed 's/.*server_name \(.*\);/\1/' | xargs)
+        CURRENT_DOMAINS=$(grep "server_name" "$NGINX_CONF" | head -1 | sed 's/.*server_name \(.*\);/\1/' | xargs)
         NEW_DOMAINS_LINE="$CURRENT_DOMAINS $DOMAIN"
-        # Используем | как разделитель, чтобы пробелы и спецсимволы не ломали sed
-        sed -i "s|server_name .*;|server_name $NEW_DOMAINS_LINE;|" "$NGINX_CONF"
+        sed -i "0,/server_name .*;/s|server_name .*;|server_name $NEW_DOMAINS_LINE;|" "$NGINX_CONF"
     fi
 else
-    # Создаем новый конфиг
-    cat > "$NGINX_CONF" <<EOF
+    # Создаём новый конфиг
+    if [ "$IS_CLOUDFLARE" = true ]; then
+        cat > "$NGINX_CONF" <<EOF
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name $DOMAIN;
+
+    ssl_certificate     /etc/nginx/ssl/self.crt;
+    ssl_certificate_key /etc/nginx/ssl/self.key;
+
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 131.0.72.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    real_ip_header CF-Connecting-IP;
+
+    location / {
+        proxy_pass http://127.0.0.1:$APP_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    else
+        cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name $DOMAIN;
@@ -62,23 +119,34 @@ server {
     }
 }
 EOF
+    fi
+
     ln -sf "$NGINX_CONF" "$NGINX_LINK"
     rm -f /etc/nginx/sites-enabled/default || true
 fi
 
-# ПЕРЕЗАГРУЗКА NGINX (Обязательно до запуска Certbot)
 nginx -t > /dev/null 2>&1 || exit_with_error "NGINX_CONFIG_INVALID"
 systemctl reload nginx
 
-# ── 4. SSL через Certbot ───────────────────────────────────────────────────
-# Получаем список доменов в формате dom1.com,dom2.com для Certbot
-FINAL_DOMAINS=$(grep "server_name" "$NGINX_CONF" | sed 's/.*server_name \(.*\);/\1/' | xargs | tr ' ' ',')
+# ── 4. SSL — только для не-Cloudflare доменов ─────────────────────────────
+if [ "$IS_CLOUDFLARE" = false ]; then
+    echo "Получаем SSL сертификат..."
+    FINAL_DOMAINS=$(grep "server_name" "$NGINX_CONF" | head -1 | sed 's/.*server_name \(.*\);/\1/' | xargs | tr ' ' ',')
 
-# Запускаем Certbot
-if ! certbot --nginx -d "$FINAL_DOMAINS" --email "$EMAIL" --agree-tos --non-interactive --redirect --expand --cert-name "$CONFIG_NAME"; then
-    exit_with_error "SSL_ISSUANCE_FAILED"
+    if ! certbot --nginx \
+        -d "$FINAL_DOMAINS" \
+        --email "$EMAIL" \
+        --agree-tos \
+        --non-interactive \
+        --redirect \
+        --expand \
+        --cert-name "$CONFIG_NAME"; then
+        exit_with_error "SSL_ISSUANCE_FAILED"
+    fi
+else
+    echo "Cloudflare домен — certbot пропущен, HTTPS через Cloudflare"
 fi
 
 # ── 5. Успех ───────────────────────────────────────────────────────────────
-echo "SUCCESS: Domain $DOMAIN added to port $APP_PORT"
+echo "SUCCESS: Domain $DOMAIN -> port $APP_PORT (cloudflare=$IS_CLOUDFLARE)"
 exit 0
