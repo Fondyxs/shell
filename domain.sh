@@ -28,7 +28,6 @@ fi
 
 echo "DNS OK: $DOMAIN -> $DOMAIN_IP"
 
-# Определяем Cloudflare по диапазонам их IP
 IS_CLOUDFLARE=false
 CLOUDFLARE_RANGES=$(curl -s --max-time 5 https://www.cloudflare.com/ips-v4 || echo "")
 
@@ -56,9 +55,10 @@ fi
 if [ -f "$NGINX_CONF" ]; then
     # Конфиг уже есть — добавляем домен если его нет
     if ! grep -q -w "$DOMAIN" "$NGINX_CONF"; then
-        CURRENT_DOMAINS=$(grep "server_name" "$NGINX_CONF" | head -1 | sed 's/.*server_name \(.*\);/\1/' | xargs)
-        NEW_DOMAINS_LINE="$CURRENT_DOMAINS $DOMAIN"
-        sed -i "0,/server_name .*;/s|server_name .*;|server_name $NEW_DOMAINS_LINE;|" "$NGINX_CONF"
+        # Берём текущие домены из первой строки server_name
+        CURRENT_DOMAINS=$(awk '/server_name/{gsub(/server_name /,""); gsub(/;/,""); print; exit}' "$NGINX_CONF" | xargs)
+        # Заменяем только первое вхождение server_name
+        sed -i "0,/server_name [^;]*;/s/server_name [^;]*;/server_name $CURRENT_DOMAINS $DOMAIN;/" "$NGINX_CONF"
     fi
 else
     # Создаём новый конфиг
@@ -125,13 +125,19 @@ EOF
     rm -f /etc/nginx/sites-enabled/default || true
 fi
 
-nginx -t > /dev/null 2>&1 || exit_with_error "NGINX_CONFIG_INVALID"
+# Проверка с выводом ошибки
+NGINX_TEST=$(nginx -t 2>&1)
+if ! nginx -t > /dev/null 2>&1; then
+    echo "$NGINX_TEST" >&2
+    exit_with_error "NGINX_CONFIG_INVALID"
+fi
+
 systemctl reload nginx
 
 # ── 4. SSL — только для не-Cloudflare доменов ─────────────────────────────
 if [ "$IS_CLOUDFLARE" = false ]; then
     echo "Получаем SSL сертификат..."
-    FINAL_DOMAINS=$(grep "server_name" "$NGINX_CONF" | head -1 | sed 's/.*server_name \(.*\);/\1/' | xargs | tr ' ' ',')
+    FINAL_DOMAINS=$(awk '/server_name/{gsub(/server_name /,""); gsub(/;/,""); print; exit}' "$NGINX_CONF" | xargs | tr ' ' ',')
 
     if ! certbot --nginx \
         -d "$FINAL_DOMAINS" \
