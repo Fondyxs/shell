@@ -53,13 +53,15 @@ fi
 
 # ── 3. Настройка Nginx ─────────────────────────────────────────────────────
 if [ -f "$NGINX_CONF" ]; then
-    # Конфиг уже есть — добавляем домен если его нет
-    if ! grep -q -w "$DOMAIN" "$NGINX_CONF"; then
-        # Берём текущие домены из первой строки server_name
-        CURRENT_DOMAINS=$(awk '/server_name/{gsub(/server_name /,""); gsub(/;/,""); print; exit}' "$NGINX_CONF" | xargs)
-        # Заменяем только первое вхождение server_name
-        sed -i "0,/server_name [^;]*;/s/server_name [^;]*;/server_name $CURRENT_DOMAINS $DOMAIN;/" "$NGINX_CONF"
+    # Домен уже есть в конфиге — ничего делать не надо
+    if grep -q -w "$DOMAIN" "$NGINX_CONF"; then
+        echo "SUCCESS: Domain $DOMAIN already configured"
+        exit 0
     fi
+
+    # Добавляем домен к существующему конфигу
+    CURRENT_DOMAINS=$(awk '/server_name/{gsub(/server_name /,""); gsub(/;/,""); print; exit}' "$NGINX_CONF" | xargs)
+    sed -i "0,/server_name [^;]*;/s/server_name [^;]*;/server_name $CURRENT_DOMAINS $DOMAIN;/" "$NGINX_CONF"
 else
     # Создаём новый конфиг
     if [ "$IS_CLOUDFLARE" = true ]; then
@@ -125,7 +127,7 @@ EOF
     rm -f /etc/nginx/sites-enabled/default || true
 fi
 
-# Проверка с выводом ошибки
+# Проверка nginx с выводом ошибки
 NGINX_TEST=$(nginx -t 2>&1)
 if ! nginx -t > /dev/null 2>&1; then
     echo "$NGINX_TEST" >&2
@@ -149,6 +151,18 @@ if [ "$IS_CLOUDFLARE" = false ]; then
         --cert-name "$CONFIG_NAME"; then
         exit_with_error "SSL_ISSUANCE_FAILED"
     fi
+
+    # Убираем сломанные пустые if ($host =) блоки которые certbot иногда добавляет
+    perl -i -0pe 's/\s*if \(\$host =\) \{\s*return 301 https:\/\/\$host\$request_uri;\s*\} # managed by Certbot//g' "$NGINX_CONF"
+
+    # Проверяем ещё раз после certbot
+    NGINX_TEST=$(nginx -t 2>&1)
+    if ! nginx -t > /dev/null 2>&1; then
+        echo "$NGINX_TEST" >&2
+        exit_with_error "NGINX_CONFIG_INVALID_AFTER_CERTBOT"
+    fi
+
+    systemctl reload nginx
 else
     echo "Cloudflare домен — certbot пропущен, HTTPS через Cloudflare"
 fi
